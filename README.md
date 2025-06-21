@@ -48,6 +48,7 @@ dragify-ai-agent/
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── docker-compose.yml
+│
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -69,6 +70,7 @@ dragify-ai-agent/
 │   ├── vite.config.js
 │   ├── tailwind.config.js
 │   └── index.html
+│
 ├── README.md
 ├── .env.example
 └── .gitignore
