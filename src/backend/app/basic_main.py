@@ -22,7 +22,7 @@ from pathlib import Path
 import random
 
 # FastAPI and related imports
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -212,7 +212,7 @@ class WorkflowExecutionResponse(BaseModel):
 class TriggerData(BaseModel):
     agent_id: int
     data: dict
-    priority: Optional[str] = "normal"  # low, normal, high
+    priority: Optional[str] = "normal"
     async_execution: Optional[bool] = True
 
 class StatsResponse(BaseModel):
@@ -337,8 +337,7 @@ class DragifyAgent:
     
     async def _fetch_from_google_sheets(self, config: dict, trigger_data: dict) -> dict:
         """Fetch data from Google Sheets with authentication"""
-        # Mock implementation with more realistic data
-        await asyncio.sleep(0.5)  # Simulate API call
+        await asyncio.sleep(0.5)
         return {
             "name": f"Lead_{random.randint(1000, 9999)}",
             "email": f"lead{random.randint(100, 999)}@example.com",
@@ -349,6 +348,48 @@ class DragifyAgent:
             "interest_level": random.choice(["high", "medium", "low"]),
             "sheet_id": config.get("sheet_id"),
             "row_id": random.randint(1, 1000),
+            "trigger_info": trigger_data,
+            "fetched_at": datetime.utcnow().isoformat()
+        }
+    
+    async def _fetch_from_mongodb(self, config: dict, trigger_data: dict) -> dict:
+        """Fetch data from MongoDB"""
+        await asyncio.sleep(0.3)
+        return {
+            "name": "MongoDB Lead",
+            "email": "mongo@example.com",
+            "company": "Mongo Corp",
+            "phone": "+1-555-MONGO",
+            "source": "mongodb",
+            "collection": config.get("collection"),
+            "trigger_info": trigger_data,
+            "fetched_at": datetime.utcnow().isoformat()
+        }
+    
+    async def _fetch_from_postgresql(self, config: dict, trigger_data: dict) -> dict:
+        """Fetch data from PostgreSQL"""
+        await asyncio.sleep(0.4)
+        return {
+            "name": "PostgreSQL Lead",
+            "email": "postgres@example.com",
+            "company": "Postgres Corp",
+            "phone": "+1-555-PGSQL",
+            "source": "postgresql",
+            "table": config.get("table"),
+            "trigger_info": trigger_data,
+            "fetched_at": datetime.utcnow().isoformat()
+        }
+    
+    async def _fetch_from_airtable(self, config: dict, trigger_data: dict) -> dict:
+        """Fetch data from Airtable"""
+        await asyncio.sleep(0.3)
+        return {
+            "name": "Airtable Lead",
+            "email": "airtable@example.com",
+            "company": "Airtable Corp",
+            "phone": "+1-555-AIRT",
+            "source": "airtable",
+            "base_id": config.get("base_id"),
             "trigger_info": trigger_data,
             "fetched_at": datetime.utcnow().isoformat()
         }
@@ -383,7 +424,6 @@ class DragifyAgent:
     
     async def _enrich_lead_data(self, lead_data: dict) -> dict:
         """Enrich lead data with additional information"""
-        # Mock enrichment service
         lead_data["enriched"] = True
         lead_data["company_size"] = random.choice(["1-10", "11-50", "51-200", "201-1000", "1000+"])
         lead_data["industry"] = random.choice(["Technology", "Healthcare", "Finance", "Manufacturing", "Retail"])
@@ -398,7 +438,7 @@ class DragifyAgent:
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                await asyncio.sleep(2 ** attempt)
                 self.logger.warning(f"CRM insertion attempt {attempt + 1} failed, retrying...")
     
     async def _insert_to_crm(self, lead_data: dict) -> dict:
@@ -424,10 +464,44 @@ class DragifyAgent:
             self.logger.error(f"Failed to insert to {self.crm_type}: {str(e)}")
             raise
     
+    async def _insert_to_zoho(self, config: dict, lead_data: dict) -> dict:
+        """Insert lead into Zoho CRM"""
+        await asyncio.sleep(0.5)
+        success = random.random() > 0.05
+        if not success:
+            raise Exception("Zoho API rate limit exceeded")
+        
+        return {
+            "crm": "zoho",
+            "lead_id": f"ZOHO_{uuid.uuid4().hex[:8].upper()}",
+            "status": "created",
+            "message": "Lead successfully created in Zoho CRM"
+        }
+    
+    async def _insert_to_salesforce(self, config: dict, lead_data: dict) -> dict:
+        """Insert lead into Salesforce CRM"""
+        await asyncio.sleep(0.4)
+        return {
+            "crm": "salesforce",
+            "lead_id": f"SF_{uuid.uuid4().hex[:8].upper()}",
+            "status": "created",
+            "message": "Lead successfully created in Salesforce"
+        }
+    
+    async def _insert_to_odoo(self, config: dict, lead_data: dict) -> dict:
+        """Insert lead into Odoo CRM"""
+        await asyncio.sleep(0.3)
+        return {
+            "crm": "odoo",
+            "lead_id": f"ODOO_{uuid.uuid4().hex[:8].upper()}",
+            "status": "created",
+            "message": "Lead successfully created in Odoo CRM"
+        }
+    
     async def _insert_to_hubspot(self, config: dict, lead_data: dict) -> dict:
         """Insert lead into HubSpot CRM"""
         await asyncio.sleep(0.4)
-        success = random.random() > 0.05  # 95% success rate
+        success = random.random() > 0.05
         if not success:
             raise Exception("HubSpot API quota exceeded")
         
@@ -453,6 +527,16 @@ class DragifyAgent:
             "message": "Lead successfully created in Pipedrive",
             "pipeline_id": config.get("pipeline_id", 1),
             "stage_id": config.get("stage_id", 1)
+        }
+    
+    async def _insert_to_mock_crm(self, config: dict, lead_data: dict) -> dict:
+        """Insert lead into Mock CRM for testing"""
+        await asyncio.sleep(0.2)
+        return {
+            "crm": "mock",
+            "lead_id": f"MOCK_{uuid.uuid4().hex[:8].upper()}",
+            "status": "created",
+            "message": "Lead successfully created in Mock CRM"
         }
     
     async def _send_notifications(self, lead_data: dict, crm_response: dict, success: bool, error: str = None) -> dict:
@@ -492,7 +576,7 @@ class DragifyAgent:
     
     async def _send_email_notification(self, lead_data: dict, crm_response: dict, success: bool, error: str = None) -> dict:
         """Send email notification"""
-        await asyncio.sleep(0.1)  # Simulate email sending
+        await asyncio.sleep(0.1)
         status = "SUCCESS" if success else "FAILED"
         return {
             "channel": "email",
@@ -624,82 +708,60 @@ class GradioDemo:
             "executions": random.randint(10, 100),
             "success_rate": f"{random.randint(85, 100)}%",
             "avg_response_time": f"{random.uniform(1.5, 5.0):.1f}s",
-            "last_execution": (datetime.now() - timedelta(minutes=random.randint(5, 180))).strftime("%Y-%m-%d %H:%M:%S")
+            "last_execution": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
         demo_state["agents"].append(agent)
         return agent_id
     
-    def get_agents_dataframe(self) -> pd.DataFrame:
-        """Get agents as DataFrame for display"""
-        if not demo_state["agents"]:
-            return pd.DataFrame(columns=["ID", "Name", "Trigger", "Data Source", "CRM", "Status", "Executions", "Success Rate", "Avg Time"])
-        
-        agents_data = []
-        for agent in demo_state["agents"]:
-            agents_data.append([
-                agent["id"],
-                agent["name"],
-                agent["trigger"],
-                agent["data_source"],
-                agent["crm"],
-                agent["status"],
-                agent["executions"],
-                agent["success_rate"],
-                agent["avg_response_time"]
-            ])
-        
-        return pd.DataFrame(agents_data, columns=["ID", "Name", "Trigger", "Data Source", "CRM", "Status", "Executions", "Success Rate", "Avg Time"])
+    def get_agent_list(self) -> list:
+        """Get list of all agents"""
+        return demo_state["agents"]
     
-    def execute_workflow(self, agent_id: int, trigger_data: Dict) -> Dict:
-        """Execute a workflow for testing with enhanced response"""
+    def update_agent(self, agent_id: int, name: str, description: str, trigger: str, data_source: str, crm: str) -> bool:
+        """Update an existing agent configuration"""
         agent = next((a for a in demo_state["agents"] if a["id"] == agent_id), None)
         if not agent:
-            return {"error": "Agent not found"}
+            return False
         
-        execution_id = len(demo_state["executions"]) + 1
+        agent["name"] = name
+        agent["description"] = description
+        agent["trigger"] = trigger
+        agent["data_source"] = data_source
+        agent["crm"] = crm
+        return True
+
+    def delete_agent(self, agent_id: int) -> bool:
+        """Delete an existing agent configuration"""
+        agent = next((a for a in demo_state["agents"] if a["id"] == agent_id), None)
+        if not agent:
+            return False
         
-        # Simulate more realistic workflow execution
-        lead_data = random.choice(SAMPLE_LEADS).copy()
-        lead_data.update({
-            "trigger_source": agent["trigger"],
-            "fetched_from": agent["data_source"],
-            "lead_score": random.randint(50, 100),
-            "enriched": True,
-            "company_size": random.choice(["1-10", "11-50", "51-200", "201-1000", "1000+"]),
-            "industry": random.choice(["Technology", "Healthcare", "Finance", "Manufacturing"])
-        })
+        demo_state["agents"].remove(agent)
+        return True
+
+    def get_agent(self, agent_id: int) -> dict:
+        """Get details of a specific agent"""
+        agent = next((a for a in demo_state["agents"] if a["id"] == agent_id), None)
+        if not agent:
+            return {}
         
-        # Simulate CRM insertion with more details
-        success = random.random() > 0.1  # 90% success rate
-        crm_response = {
-            "crm": agent["crm"],
-            "lead_id": f"{agent['crm'].upper().replace(' ', '_')}_{uuid.uuid4().hex[:8]}",
-            "contact_id": f"CONTACT_{random.randint(100000, 999999)}",
-            "status": "created" if success else "failed",
-            "pipeline_stage": "New Lead" if success else None,
-            "owner_assigned": "auto" if success else None,
-            "timestamp": datetime.now().isoformat(),
-            "processing_time": f"{random.uniform(0.5, 3.0):.2f}s"
-        }
-        
-        # Simulate notifications
-        notifications = {
-            "email_sent": True,
-            "slack_notified": random.choice([True, False]),
-            "webhook_called": random.choice([True, False]),
-            "notification_count": random.randint(1, 3)
-        }
-        
-        execution = {
-            "id": execution_id,
-            "agent_id": agent_id,
-            "agent_name": agent["name"],
-            "trigger_data": trigger_data,
-            "lead_data": lead_data,
-            "crm_response": crm_response,
-            "notifications": notifications,
-            "status": "Success" if success else "Failed",
-            "started_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "duration": f"{random.uniform(2.0, 8.0):.1f} seconds",
-            "execution_steps": [
+        return agent
+    
+
+
+if __name__ == "__main__":
+    app = FastAPI()
+    router = APIRouter()
+
+    # Define your endpoints here
+    @router.get("/ping")
+    async def ping():
+        return {"message": "pong"}
+
+    @app.get("/")
+    async def root():
+        return {"message": "Welcome to Dragify AI Agent Template!"}
+
+    app.include_router(router)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
